@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Action Points Game</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0f1117;
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+
+        header {
+            text-align: center;
+            padding: 24px 0;
+            border-bottom: 1px solid #2a2d3a;
+            margin-bottom: 24px;
+        }
+        header h1 { font-size: 28px; color: #fff; margin-bottom: 8px; }
+        .config-info {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            font-size: 13px;
+            color: #888;
+        }
+        .config-info span { background: #1a1d2a; padding: 4px 10px; border-radius: 6px; }
+
+        /* Форма регистрации */
+        .register {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+        }
+        .register textarea {
+            flex: 1;
+            padding: 10px 14px;
+            background: #1a1d2a;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 15px;
+            outline: none;
+            resize: vertical;
+            min-height: 42px;
+            font-family: inherit;
+        }
+        .register textarea:focus { border-color: #5b6eef; }
+        .register .hint { font-size: 11px; color: #555; align-self: center; white-space: nowrap; }
+        .register button {
+            padding: 10px 20px;
+            background: #5b6eef;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .register button:hover { background: #4a5bdb; }
+
+        /* Таблица */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 32px;
+        }
+        th {
+            text-align: left;
+            padding: 10px 12px;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #666;
+            border-bottom: 1px solid #2a2d3a;
+        }
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #1a1d2a;
+            vertical-align: middle;
+        }
+        tr:hover td { background: #161822; }
+        .team-name { font-weight: 600; color: #fff; }
+        .points {
+            font-weight: 700;
+            font-size: 18px;
+            color: #5bef8f;
+            font-variant-numeric: tabular-nums;
+        }
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .spend-btn {
+            padding: 5px 12px;
+            background: #2a2d3a;
+            color: #ccc;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .spend-btn:hover { background: #ef5b5b; color: #fff; border-color: #ef5b5b; }
+        .spend-btn:disabled { opacity: 0.3; cursor: not-allowed; background: #2a2d3a; color: #666; border-color: #3a3d4a; }
+        .empty-row td { text-align: center; color: #555; padding: 32px; }
+
+        /* Лог */
+        .log-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #aaa;
+        }
+        .log {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .log-entry {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: #1a1d2a;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .log-entry .cost { color: #ef5b5b; font-weight: 600; }
+        .log-entry .time { color: #555; }
+        .log-entry .status {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-pending { background: #3a3520; color: #efc35b; }
+        .status-accepted { background: #1a3520; color: #5bef8f; }
+        .status-rejected { background: #351a1a; color: #ef5b5b; }
+        .status-rework { background: #35301a; color: #efb85b; }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #fff;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 100;
+        }
+        .toast.show { opacity: 1; }
+        .toast.error { background: #ef5b5b; }
+        .toast.success { background: #5bef8f; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Action Points Game</h1>
+            <div class="config-info" id="config-info"></div>
+        </header>
+
+        <div class="register">
+            <textarea id="team-name" placeholder="Названия команд (каждая с новой строки или через запятую)" rows="2"></textarea>
+            <button onclick="createTeam()">Создать</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Команда</th>
+                    <th>Очки</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody id="teams-body">
+                <tr class="empty-row"><td colspan="4">Нет команд</td></tr>
+            </tbody>
+        </table>
+
+        <div class="log-title">Лог списаний</div>
+        <div class="log" id="log"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let spendOptions = [];
+
+        function showToast(msg, type) {
+            const t = document.getElementById("toast");
+            t.textContent = msg;
+            t.className = "toast show " + type;
+            setTimeout(() => t.className = "toast", 2500);
+        }
+
+        async function loadConfig() {
+            const res = await fetch("/api/config");
+            const cfg = await res.json();
+            spendOptions = cfg.spend_options;
+            document.getElementById("config-info").innerHTML =
+                `<span>+${cfg.points_per_minute} очков / ${cfg.tick_interval}с</span>` +
+                `<span>Списание: ${cfg.spend_options.join(", ")}</span>`;
+        }
+
+        async function loadTeams() {
+            const res = await fetch("/api/teams");
+            const teams = await res.json();
+            const tbody = document.getElementById("teams-body");
+            if (!teams.length) {
+                tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Нет команд</td></tr>';
+                return;
+            }
+            tbody.innerHTML = teams.map((t, i) => `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td class="team-name">${esc(t.name)}</td>
+                    <td class="points">${t.points}</td>
+                    <td class="actions">
+                        ${spendOptions.map(amt =>
+                            `<button class="spend-btn" ${t.points < amt ? "disabled" : ""}
+                                onclick="spend(${t.id}, ${amt})">-${amt}</button>`
+                        ).join("")}
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        async function loadReports() {
+            const res = await fetch("/api/reports");
+            const reports = await res.json();
+            const log = document.getElementById("log");
+            if (!reports.length) {
+                log.innerHTML = '<div class="log-entry" style="color:#555">Нет записей</div>';
+                return;
+            }
+            log.innerHTML = reports.map(r => `
+                <div class="log-entry">
+                    <span>${esc(r.team_name)}</span>
+                    <span class="cost">-${r.cost}</span>
+                    <span class="status status-${r.status}">${r.status}</span>
+                    <span class="time">${fmtTime(r.created_at)}</span>
+                </div>
+            `).join("");
+        }
+
+        async function createTeam() {
+            const input = document.getElementById("team-name");
+            const raw = input.value.trim();
+            if (!raw) return;
+            const names = raw.split(/[\n,]+/).map(s => s.trim()).filter(Boolean);
+            if (!names.length) return;
+            const res = await fetch("/api/teams", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({names})
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data.error, "error");
+                return;
+            }
+            input.value = "";
+            const parts = [];
+            if (data.created.length) parts.push(`Создано: ${data.created.length}`);
+            if (data.duplicates.length) parts.push(`Дубли: ${data.duplicates.join(", ")}`);
+            showToast(parts.join(" | ") || "Готово", data.duplicates.length ? "error" : "success");
+            loadTeams();
+        }
+
+        async function spend(teamId, amount) {
+            const res = await fetch(`/api/teams/${teamId}/spend`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({amount})
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data.error, "error");
+                return;
+            }
+            showToast(`Списано ${amount} очков`, "success");
+            loadTeams();
+            loadReports();
+        }
+
+        function esc(s) {
+            const d = document.createElement("div");
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function fmtTime(ts) {
+            if (!ts) return "";
+            const d = new Date(ts + "Z");
+            return d.toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+        }
+
+        document.getElementById("team-name").addEventListener("keydown", e => {
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) createTeam();
+        });
+
+        loadConfig().then(() => { loadTeams(); loadReports(); });
+        setInterval(() => { loadTeams(); loadReports(); }, 5000);
+    </script>
+</body>
+</html>
