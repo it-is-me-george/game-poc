@@ -20,6 +20,7 @@
             padding: 24px 0;
             border-bottom: 1px solid #2a2d3a;
             margin-bottom: 24px;
+            position: relative;
         }
         header h1 { font-size: 28px; color: #fff; margin-bottom: 8px; }
         .config-info {
@@ -30,6 +31,79 @@
             color: #888;
         }
         .config-info span { background: #1a1d2a; padding: 4px 10px; border-radius: 6px; }
+
+        .header-right {
+            position: absolute;
+            right: 0;
+            top: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .role-badge {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .role-admin { background: #3a2050; color: #c084fc; }
+        .role-user { background: #1a3520; color: #5bef8f; }
+        .logout-btn {
+            padding: 6px 14px;
+            background: #2a2d3a;
+            color: #aaa;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .logout-btn:hover { background: #3a3d4a; color: #fff; }
+
+        /* Экран логина */
+        .login-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 60vh;
+            gap: 16px;
+        }
+        .login-screen h2 { font-size: 24px; color: #fff; margin-bottom: 8px; }
+        .login-screen p { color: #888; font-size: 14px; margin-bottom: 8px; }
+        .login-form {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 360px;
+        }
+        .login-form input {
+            flex: 1;
+            padding: 12px 16px;
+            background: #1a1d2a;
+            border: 1px solid #2a2d3a;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 16px;
+            outline: none;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        .login-form input:focus { border-color: #5b6eef; }
+        .login-form button {
+            padding: 12px 24px;
+            background: #5b6eef;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .login-form button:hover { background: #4a5bdb; }
+        .login-error {
+            color: #ef5b5b;
+            font-size: 14px;
+            min-height: 20px;
+        }
 
         /* Форма регистрации */
         .register {
@@ -62,6 +136,51 @@
             cursor: pointer;
         }
         .register button:hover { background: #4a5bdb; }
+
+        /* Карточка команды (для обычного пользователя) */
+        .team-card {
+            background: #1a1d2a;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .team-card .tc-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+        }
+        .team-card .tc-points {
+            font-size: 48px;
+            font-weight: 800;
+            color: #5bef8f;
+            font-variant-numeric: tabular-nums;
+        }
+        .team-card .tc-label {
+            font-size: 14px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .team-card .tc-actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .named-spend-btn {
+            padding: 10px 18px;
+            background: #2a2d3a;
+            color: #ccc;
+            border: 1px solid #3a3d4a;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        .named-spend-btn:hover { background: #ef5b5b; color: #fff; border-color: #ef5b5b; }
+        .named-spend-btn:disabled { opacity: 0.3; cursor: not-allowed; background: #2a2d3a; color: #666; border-color: #3a3d4a; }
+        .named-spend-btn .btn-cost { font-weight: 700; }
 
         /* Таблица */
         table {
@@ -103,6 +222,15 @@
         .spend-btn:hover { background: #ef5b5b; color: #fff; border-color: #ef5b5b; }
         .spend-btn:disabled { opacity: 0.3; cursor: not-allowed; background: #2a2d3a; color: #666; border-color: #3a3d4a; }
         .empty-row td { text-align: center; color: #555; padding: 32px; }
+
+        .team-code {
+            font-family: monospace;
+            font-size: 12px;
+            color: #888;
+            background: #0f1117;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
 
         /* Лог */
         .log-title {
@@ -152,42 +280,187 @@
         .toast.show { opacity: 1; }
         .toast.error { background: #ef5b5b; }
         .toast.success { background: #5bef8f; color: #000; }
+
+        /* Модалка кодов */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+        }
+        .modal {
+            background: #1a1d2a;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 420px;
+            width: 90%;
+        }
+        .modal h3 { color: #fff; margin-bottom: 16px; font-size: 18px; }
+        .modal .code-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+        .modal .code-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: #0f1117;
+            border-radius: 6px;
+        }
+        .modal .code-item .name { color: #fff; font-weight: 600; }
+        .modal .code-item .code {
+            font-family: monospace;
+            font-size: 16px;
+            letter-spacing: 2px;
+            color: #5bef8f;
+            font-weight: 700;
+        }
+        .modal button {
+            width: 100%;
+            padding: 10px;
+            background: #5b6eef;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+        .modal button:hover { background: #4a5bdb; }
+
+        /* Админ-панель управления */
+        .admin-controls {
+            background: #1a1d2a;
+            border: 1px solid #2a2d3a;
+            border-radius: 10px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .admin-controls .ctrl-label {
+            font-size: 13px;
+            color: #888;
+        }
+        .admin-controls input[type="number"] {
+            width: 70px;
+            padding: 6px 8px;
+            background: #0f1117;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 14px;
+            text-align: center;
+            outline: none;
+        }
+        .admin-controls input[type="number"]:focus { border-color: #5b6eef; }
+        .ctrl-btn {
+            padding: 6px 14px;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            background: #2a2d3a;
+            color: #ccc;
+        }
+        .ctrl-btn:hover { background: #3a3d4a; color: #fff; }
+        .ctrl-btn.primary { background: #5b6eef; color: #fff; border-color: #5b6eef; }
+        .ctrl-btn.primary:hover { background: #4a5bdb; }
+        .ctrl-btn.danger { background: #4a1a1a; color: #ef5b5b; border-color: #5a2a2a; }
+        .ctrl-btn.danger:hover { background: #ef5b5b; color: #fff; }
+        .ctrl-sep { width: 1px; height: 24px; background: #2a2d3a; }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Action Points Game</h1>
-            <div class="config-info" id="config-info"></div>
-        </header>
-
-        <div class="register">
-            <textarea id="team-name" placeholder="Названия команд (каждая с новой строки или через запятую)" rows="2"></textarea>
-            <button onclick="createTeam()">Создать</button>
+        <!-- Экран входа -->
+        <div id="login-screen" class="login-screen hidden">
+            <h2>Action Points Game</h2>
+            <p>Введите код для входа</p>
+            <div class="login-form">
+                <input type="text" id="login-code" placeholder="Код доступа" autocomplete="off">
+                <button onclick="doLogin()">Войти</button>
+            </div>
+            <div class="login-error" id="login-error"></div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Команда</th>
-                    <th>Очки</th>
-                    <th>Действия</th>
-                </tr>
-            </thead>
-            <tbody id="teams-body">
-                <tr class="empty-row"><td colspan="4">Нет команд</td></tr>
-            </tbody>
-        </table>
+        <!-- Основной интерфейс -->
+        <div id="main-app" class="hidden">
+            <header>
+                <h1>Action Points Game</h1>
+                <div class="config-info" id="config-info"></div>
+                <div class="header-right">
+                    <span class="role-badge" id="role-badge"></span>
+                    <button class="logout-btn" onclick="doLogout()">Выйти</button>
+                </div>
+            </header>
 
-        <div class="log-title">Лог списаний</div>
-        <div class="log" id="log"></div>
+            <!-- Форма создания (только админ) -->
+            <div class="register hidden" id="register-section">
+                <textarea id="team-name" placeholder="Названия команд (каждая с новой строки или через запятую)" rows="2"></textarea>
+                <button onclick="createTeam()">Создать</button>
+            </div>
+
+            <!-- Админ-панель управления -->
+            <div class="admin-controls hidden" id="admin-controls">
+                <span class="ctrl-label">Очков за тик:</span>
+                <input type="number" id="cfg-points" min="0" value="100">
+                <span class="ctrl-label">Интервал (сек):</span>
+                <input type="number" id="cfg-interval" min="1" value="60">
+                <button class="ctrl-btn primary" onclick="saveSettings()">Сохранить</button>
+                <div class="ctrl-sep"></div>
+                <span class="ctrl-label">Всем командам:</span>
+                <input type="number" id="add-points-amount" min="1" value="10" style="width:60px">
+                <button class="ctrl-btn" onclick="addPointsAll()">+ Начислить</button>
+                <div class="ctrl-sep"></div>
+                <button class="ctrl-btn danger" onclick="resetPointsAll()">Обнулить всё</button>
+            </div>
+
+            <!-- Карточка команды (только обычный пользователь) -->
+            <div id="team-card-section" class="hidden">
+                <div class="team-card">
+                    <div class="tc-name" id="tc-name"></div>
+                    <div class="tc-points" id="tc-points">0</div>
+                    <div class="tc-label">очков</div>
+                    <div class="tc-actions" id="tc-actions"></div>
+                </div>
+            </div>
+
+            <!-- Таблица всех команд (только админ) -->
+            <div id="teams-table-section" class="hidden">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Команда</th>
+                            <th>Код</th>
+                            <th>Очки</th>
+                            <th>Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teams-body">
+                        <tr class="empty-row"><td colspan="5">Нет команд</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="log-title">Лог списаний</div>
+            <div class="log" id="log"></div>
+        </div>
     </div>
 
     <div class="toast" id="toast"></div>
 
     <script>
         let spendOptions = [];
+        let spendNamed = [];
+        let currentRole = null;
+        let currentTeamId = null;
+        let pollInterval = null;
 
         function showToast(msg, type) {
             const t = document.getElementById("toast");
@@ -196,40 +469,138 @@
             setTimeout(() => t.className = "toast", 2500);
         }
 
+        // ---- Авторизация ----
+
+        async function checkAuth() {
+            const res = await fetch("/api/me");
+            const data = await res.json();
+            if (data.role) {
+                currentRole = data.role;
+                currentTeamId = data.team_id || null;
+                showApp(data);
+            } else {
+                showLogin();
+            }
+        }
+
+        function showLogin() {
+            currentRole = null;
+            currentTeamId = null;
+            document.getElementById("login-screen").classList.remove("hidden");
+            document.getElementById("main-app").classList.add("hidden");
+            document.getElementById("login-error").textContent = "";
+            document.getElementById("login-code").value = "";
+            document.getElementById("login-code").focus();
+            if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+        }
+
+        function showApp(userData) {
+            document.getElementById("login-screen").classList.add("hidden");
+            document.getElementById("main-app").classList.remove("hidden");
+
+            const badge = document.getElementById("role-badge");
+            if (currentRole === "admin") {
+                badge.textContent = "Админ";
+                badge.className = "role-badge role-admin";
+                document.getElementById("register-section").classList.remove("hidden");
+                document.getElementById("admin-controls").classList.remove("hidden");
+                document.getElementById("teams-table-section").classList.remove("hidden");
+                document.getElementById("team-card-section").classList.add("hidden");
+            } else {
+                badge.textContent = userData.team_name || "Команда";
+                badge.className = "role-badge role-user";
+                document.getElementById("register-section").classList.add("hidden");
+                document.getElementById("admin-controls").classList.add("hidden");
+                document.getElementById("teams-table-section").classList.add("hidden");
+                document.getElementById("team-card-section").classList.remove("hidden");
+            }
+
+            loadConfig().then(() => { loadTeams(); loadReports(); });
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(() => { loadTeams(); loadReports(); }, 5000);
+        }
+
+        async function doLogin() {
+            const code = document.getElementById("login-code").value.trim();
+            if (!code) return;
+            const errEl = document.getElementById("login-error");
+            errEl.textContent = "";
+            const res = await fetch("/api/login", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({code})
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                errEl.textContent = data.error || "Ошибка входа";
+                return;
+            }
+            currentRole = data.role;
+            currentTeamId = data.team_id || null;
+            showApp(data);
+        }
+
+        async function doLogout() {
+            await fetch("/api/logout", {method: "POST"});
+            showLogin();
+        }
+
+        // ---- Данные ----
+
         async function loadConfig() {
             const res = await fetch("/api/config");
             const cfg = await res.json();
             spendOptions = cfg.spend_options;
+            spendNamed = cfg.spend_named || [];
             document.getElementById("config-info").innerHTML =
-                `<span>+${cfg.points_per_minute} очков / ${cfg.tick_interval}с</span>` +
+                `<span>+${cfg.points_per_tick} очков / ${cfg.tick_interval}с</span>` +
                 `<span>Списание: ${cfg.spend_options.join(", ")}</span>`;
+            document.getElementById("cfg-points").value = cfg.points_per_tick;
+            document.getElementById("cfg-interval").value = cfg.tick_interval;
         }
 
         async function loadTeams() {
             const res = await fetch("/api/teams");
+            if (res.status === 401) { showLogin(); return; }
             const teams = await res.json();
-            const tbody = document.getElementById("teams-body");
-            if (!teams.length) {
-                tbody.innerHTML = '<tr class="empty-row"><td colspan="4">Нет команд</td></tr>';
-                return;
+
+            if (currentRole === "admin") {
+                const tbody = document.getElementById("teams-body");
+                if (!teams.length) {
+                    tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Нет команд</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = teams.map((t, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="team-name">${esc(t.name)}</td>
+                        <td><span class="team-code">${t.code ? esc(t.code) : "—"}</span></td>
+                        <td class="points">${t.points}</td>
+                        <td class="actions">
+                            ${spendOptions.map(amt =>
+                                `<button class="spend-btn" ${t.points < amt ? "disabled" : ""}
+                                    onclick="spend(${t.id}, ${amt})">-${amt}</button>`
+                            ).join("")}
+                        </td>
+                    </tr>
+                `).join("");
+            } else {
+                // Обычный пользователь — карточка своей команды
+                if (teams.length) {
+                    const t = teams[0];
+                    document.getElementById("tc-name").textContent = t.name;
+                    document.getElementById("tc-points").textContent = t.points;
+                    document.getElementById("tc-actions").innerHTML = spendNamed.map(s =>
+                        `<button class="named-spend-btn" ${t.points < s.cost ? "disabled" : ""}
+                            onclick="spend(${t.id}, ${s.cost}, '${esc(s.name)}')">${esc(s.name)} <span class="btn-cost">-${s.cost}</span></button>`
+                    ).join("");
+                }
             }
-            tbody.innerHTML = teams.map((t, i) => `
-                <tr>
-                    <td>${i + 1}</td>
-                    <td class="team-name">${esc(t.name)}</td>
-                    <td class="points">${t.points}</td>
-                    <td class="actions">
-                        ${spendOptions.map(amt =>
-                            `<button class="spend-btn" ${t.points < amt ? "disabled" : ""}
-                                onclick="spend(${t.id}, ${amt})">-${amt}</button>`
-                        ).join("")}
-                    </td>
-                </tr>
-            `).join("");
         }
 
         async function loadReports() {
             const res = await fetch("/api/reports");
+            if (res.status === 401) { showLogin(); return; }
             const reports = await res.json();
             const log = document.getElementById("log");
             if (!reports.length) {
@@ -239,6 +610,7 @@
             log.innerHTML = reports.map(r => `
                 <div class="log-entry">
                     <span>${esc(r.team_name)}</span>
+                    ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
                     <span class="cost">-${r.cost}</span>
                     <span class="status status-${r.status}">${r.status}</span>
                     <span class="time">${fmtTime(r.created_at)}</span>
@@ -263,6 +635,12 @@
                 return;
             }
             input.value = "";
+
+            // Показать коды созданных команд
+            if (data.codes && Object.keys(data.codes).length) {
+                showCodesModal(data.codes);
+            }
+
             const parts = [];
             if (data.created.length) parts.push(`Создано: ${data.created.length}`);
             if (data.duplicates.length) parts.push(`Дубли: ${data.duplicates.join(", ")}`);
@@ -270,20 +648,82 @@
             loadTeams();
         }
 
-        async function spend(teamId, amount) {
+        function showCodesModal(codes) {
+            const overlay = document.createElement("div");
+            overlay.className = "modal-overlay";
+            overlay.innerHTML = `
+                <div class="modal">
+                    <h3>Коды доступа команд</h3>
+                    <div class="code-list">
+                        ${Object.entries(codes).map(([name, code]) => `
+                            <div class="code-item">
+                                <span class="name">${esc(name)}</span>
+                                <span class="code">${esc(code)}</span>
+                            </div>
+                        `).join("")}
+                    </div>
+                    <button onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        async function spend(teamId, amount, label) {
+            const body = {amount};
+            if (label) body.label = label;
             const res = await fetch(`/api/teams/${teamId}/spend`, {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({amount})
+                body: JSON.stringify(body)
             });
             const data = await res.json();
             if (!res.ok) {
                 showToast(data.error, "error");
                 return;
             }
-            showToast(`Списано ${amount} очков`, "success");
+            showToast(`Списано ${amount} очков` + (label ? ` (${label})` : ""), "success");
             loadTeams();
             loadReports();
+        }
+
+        async function saveSettings() {
+            const pts = parseInt(document.getElementById("cfg-points").value);
+            const interval = parseInt(document.getElementById("cfg-interval").value);
+            const res = await fetch("/api/admin/settings", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({points_per_tick: pts, tick_interval: interval})
+            });
+            const data = await res.json();
+            if (!res.ok) { showToast(data.error, "error"); return; }
+            showToast(`Настройки: +${pts} очков / ${interval}с`, "success");
+            loadConfig();
+        }
+
+        async function addPointsAll() {
+            const amount = parseInt(document.getElementById("add-points-amount").value);
+            if (!amount || amount <= 0) return;
+            const res = await fetch("/api/admin/add-points", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({amount})
+            });
+            const data = await res.json();
+            if (!res.ok) { showToast(data.error, "error"); return; }
+            showToast(`+${amount} очков всем командам`, "success");
+            loadTeams();
+        }
+
+        async function resetPointsAll() {
+            if (!confirm("Обнулить очки всех команд?")) return;
+            const res = await fetch("/api/admin/reset-points", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"}
+            });
+            const data = await res.json();
+            if (!res.ok) { showToast(data.error, "error"); return; }
+            showToast("Очки всех команд обнулены", "success");
+            loadTeams();
         }
 
         function esc(s) {
@@ -298,12 +738,18 @@
             return d.toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
         }
 
+        // Enter для логина
+        document.getElementById("login-code").addEventListener("keydown", e => {
+            if (e.key === "Enter") doLogin();
+        });
+
+        // Ctrl+Enter для создания команды
         document.getElementById("team-name").addEventListener("keydown", e => {
             if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) createTeam();
         });
 
-        loadConfig().then(() => { loadTeams(); loadReports(); });
-        setInterval(() => { loadTeams(); loadReports(); }, 5000);
+        // Старт
+        checkAuth();
     </script>
 </body>
 </html>
