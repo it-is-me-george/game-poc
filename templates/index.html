@@ -251,6 +251,22 @@
             background: #1a1d2a;
             border-radius: 6px;
             font-size: 13px;
+            position: relative;
+        }
+        .log-entry .log-uuid {
+            font-family: monospace;
+            font-size: 11px;
+            color: #666;
+        }
+        .log-entry .log-uuid .uuid-full {
+            display: none;
+        }
+        .log-entry:hover .log-uuid .uuid-short {
+            display: none;
+        }
+        .log-entry:hover .log-uuid .uuid-full {
+            display: inline;
+            color: #5bef8f;
         }
         .log-entry .cost { color: #ef5b5b; font-weight: 600; }
         .log-entry .time { color: #555; }
@@ -449,6 +465,10 @@
             </div>
 
             <div class="log-title">Лог списаний</div>
+            <input type="text" id="log-search" placeholder="Поиск по имени или UUID..." oninput="filterLog()" style="
+                width:100%; padding:8px 14px; margin-bottom:12px; background:#1a1d2a;
+                border:1px solid #2a2d3a; border-radius:8px; color:#fff; font-size:14px; outline:none;
+            " onfocus="this.style.borderColor='#5b6eef'" onblur="this.style.borderColor='#2a2d3a'">
             <div class="log" id="log"></div>
         </div>
     </div>
@@ -458,6 +478,7 @@
     <script>
         let spendOptions = [];
         let spendNamed = [];
+        let allReports = [];
         let currentRole = null;
         let currentTeamId = null;
         let pollInterval = null;
@@ -581,6 +602,8 @@
                                 `<button class="spend-btn" ${t.points < amt ? "disabled" : ""}
                                     onclick="spend(${t.id}, ${amt})">-${amt}</button>`
                             ).join("")}
+                            <button class="spend-btn" style="color:#ef5b5b;border-color:#5a2a2a"
+                                onclick="deleteTeam(${t.id}, '${esc(t.name)}')">&#x2715;</button>
                         </td>
                     </tr>
                 `).join("");
@@ -601,21 +624,8 @@
         async function loadReports() {
             const res = await fetch("/api/reports");
             if (res.status === 401) { showLogin(); return; }
-            const reports = await res.json();
-            const log = document.getElementById("log");
-            if (!reports.length) {
-                log.innerHTML = '<div class="log-entry" style="color:#555">Нет записей</div>';
-                return;
-            }
-            log.innerHTML = reports.map(r => `
-                <div class="log-entry">
-                    <span>${esc(r.team_name)}</span>
-                    ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
-                    <span class="cost">-${r.cost}</span>
-                    <span class="status status-${r.status}">${r.status}</span>
-                    <span class="time">${fmtTime(r.created_at)}</span>
-                </div>
-            `).join("");
+            allReports = await res.json();
+            filterLog();
         }
 
         async function createTeam() {
@@ -681,7 +691,63 @@
                 showToast(data.error, "error");
                 return;
             }
-            showToast(`Списано ${amount} очков` + (label ? ` (${label})` : ""), "success");
+            if (data.uuid) {
+                showUuidModal(data.uuid, amount, label);
+            } else {
+                showToast(`Списано ${amount} очков` + (label ? ` (${label})` : ""), "success");
+            }
+            loadTeams();
+            loadReports();
+        }
+
+        function showUuidModal(txnUuid, amount, label) {
+            const overlay = document.createElement("div");
+            overlay.className = "modal-overlay";
+            overlay.innerHTML = `
+                <div class="modal">
+                    <h3>Списание выполнено</h3>
+                    <div style="text-align:center;margin-bottom:16px;">
+                        <div style="color:#888;font-size:13px;margin-bottom:4px;">${label ? esc(label) + ' · ' : ''}-${amount} очков</div>
+                        <div style="font-family:monospace;font-size:18px;color:#5bef8f;font-weight:700;letter-spacing:1px;
+                            background:#0f1117;padding:12px;border-radius:8px;word-break:break-all;user-select:all;">${esc(txnUuid)}</div>
+                        <div style="color:#555;font-size:12px;margin-top:6px;">Сохраните этот код</div>
+                    </div>
+                    <button onclick="this.closest('.modal-overlay').remove()">Закрыть</button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        function filterLog() {
+            const query = (document.getElementById("log-search").value || "").toLowerCase();
+            const filtered = query
+                ? allReports.filter(r =>
+                    r.team_name.toLowerCase().includes(query) ||
+                    (r.uuid && r.uuid.toLowerCase().includes(query)))
+                : allReports;
+            const log = document.getElementById("log");
+            if (!filtered.length) {
+                log.innerHTML = '<div class="log-entry" style="color:#555">Нет записей</div>';
+                return;
+            }
+            log.innerHTML = filtered.map(r => `
+                <div class="log-entry">
+                    <span>${esc(r.team_name)}</span>
+                    ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
+                    <span class="cost">-${r.cost}</span>
+                    ${r.uuid ? `<span class="log-uuid"><span class="uuid-short">${esc(r.uuid.slice(0,8))}</span><span class="uuid-full">${esc(r.uuid)}</span></span>` : ""}
+                    <span class="status status-${r.status}">${r.status}</span>
+                    <span class="time">${fmtTime(r.created_at)}</span>
+                </div>
+            `).join("");
+        }
+
+        async function deleteTeam(teamId, name) {
+            if (!confirm(`Удалить команду "${name}" и все её отчёты?`)) return;
+            const res = await fetch(`/api/teams/${teamId}`, {method: "DELETE"});
+            const data = await res.json();
+            if (!res.ok) { showToast(data.error, "error"); return; }
+            showToast(`Команда "${name}" удалена`, "success");
             loadTeams();
             loadReports();
         }

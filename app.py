@@ -4,6 +4,7 @@ import string
 import random
 import threading
 import time
+import uuid
 from functools import wraps
 from dotenv import load_dotenv
 from flask import Flask, jsonify, request, render_template, g, session
@@ -66,6 +67,7 @@ def init_db():
             team_id INTEGER NOT NULL,
             cost INTEGER NOT NULL,
             label TEXT,
+            uuid TEXT,
             status TEXT DEFAULT 'pending',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (team_id) REFERENCES teams(id)
@@ -82,6 +84,8 @@ def init_db():
     report_columns = [row[1] for row in cursor2.fetchall()]
     if "label" not in report_columns:
         conn.execute("ALTER TABLE reports ADD COLUMN label TEXT")
+    if "uuid" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN uuid TEXT")
     # Сгенерировать коды для команд, у которых их нет
     teams_without_code = conn.execute(
         "SELECT id FROM teams WHERE code IS NULL"
@@ -276,13 +280,14 @@ def spend_points(team_id):
     if team["points"] < amount:
         return jsonify(error="Недостаточно очков"), 400
 
+    txn_uuid = str(uuid.uuid4())
     db.execute("UPDATE teams SET points = points - ? WHERE id = ?", (amount, team_id))
     db.execute(
-        "INSERT INTO reports (team_id, cost, status, label) VALUES (?, ?, 'pending', ?)",
-        (team_id, amount, label or None),
+        "INSERT INTO reports (team_id, cost, status, label, uuid) VALUES (?, ?, 'pending', ?, ?)",
+        (team_id, amount, label or None, txn_uuid),
     )
     db.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, uuid=txn_uuid)
 
 
 @app.route("/api/reports")
@@ -291,7 +296,7 @@ def list_reports():
     db = get_db()
     if session["role"] == "admin":
         rows = db.execute("""
-            SELECT r.id, t.name AS team_name, r.cost, r.label, r.status, r.created_at
+            SELECT r.id, t.name AS team_name, r.cost, r.label, r.uuid, r.status, r.created_at
             FROM reports r JOIN teams t ON t.id = r.team_id
             ORDER BY r.created_at DESC
             LIMIT 50
@@ -299,13 +304,26 @@ def list_reports():
     else:
         team_id = session.get("team_id")
         rows = db.execute("""
-            SELECT r.id, t.name AS team_name, r.cost, r.label, r.status, r.created_at
+            SELECT r.id, t.name AS team_name, r.cost, r.label, r.uuid, r.status, r.created_at
             FROM reports r JOIN teams t ON t.id = r.team_id
             WHERE r.team_id = ?
             ORDER BY r.created_at DESC
             LIMIT 50
         """, (team_id,)).fetchall()
     return jsonify([dict(r) for r in rows])
+
+
+@app.route("/api/teams/<int:team_id>", methods=["DELETE"])
+@admin_required
+def delete_team(team_id):
+    db = get_db()
+    team = db.execute("SELECT id FROM teams WHERE id = ?", (team_id,)).fetchone()
+    if not team:
+        return jsonify(error="Команда не найдена"), 404
+    db.execute("DELETE FROM reports WHERE team_id = ?", (team_id,))
+    db.execute("DELETE FROM teams WHERE id = ?", (team_id,))
+    db.commit()
+    return jsonify(ok=True)
 
 
 # ---- Админ: управление игрой ----
