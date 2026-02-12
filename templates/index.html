@@ -617,10 +617,12 @@
                         <td><span class="team-code">${t.code ? esc(t.code) : "—"}</span></td>
                         <td class="points">${t.points}</td>
                         <td class="actions">
-                            ${spendOptions.map(amt =>
-                                `<button class="spend-btn" ${t.points < amt ? "disabled" : ""}
-                                    onclick="spend(${t.id}, ${amt})">-${amt}</button>`
-                            ).join("")}
+                            <input type="number" min="1" value="10" id="add-pts-${t.id}" style="width:50px;padding:4px;background:#0f1117;border:1px solid #3a3d4a;border-radius:4px;color:#fff;font-size:12px;text-align:center;">
+                            <button class="spend-btn" style="color:#5bef8f;border-color:#1a3520"
+                                onclick="addPointsTeam(${t.id})">+</button>
+                            <input type="number" min="1" value="5" id="spend-pts-${t.id}" style="width:50px;padding:4px;background:#0f1117;border:1px solid #3a3d4a;border-radius:4px;color:#fff;font-size:12px;text-align:center;">
+                            <button class="spend-btn" ${t.points < 1 ? "disabled" : ""}
+                                onclick="spendCustom(${t.id})">−</button>
                             <button class="spend-btn" style="color:#ef5b5b;border-color:#5a2a2a"
                                 onclick="deleteTeam(${t.id}, '${esc(t.name)}')">&#x2715;</button>
                         </td>
@@ -775,15 +777,20 @@
                 log.innerHTML = '<div class="log-entry" style="color:#555">Нет записей</div>';
                 return;
             }
-            log.innerHTML = allReports.map(r => `
+            log.innerHTML = allReports.map(r => {
+                const isAdd = r.type === "начисление";
+                const typeStyle = isAdd ? "color:#5bef8f" : "color:#ef5b5b";
+                const typeLabel = r.type || (r.cost < 0 ? "начисление" : "списание");
+                return `
                 <div class="log-entry">
                     <span>${esc(r.team_name)}</span>
+                    <span style="${typeStyle};font-weight:600;font-size:12px">${esc(typeLabel)}</span>
                     ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
-                    <span class="cost">${r.points_before != null ? `${r.points_before} → ${r.points_after}` : `-${r.cost}`}</span>
+                    <span style="${isAdd ? 'color:#5bef8f' : ''}" class="${isAdd ? '' : 'cost'}">${r.points_before != null ? `${r.points_before} → ${r.points_after}` : (isAdd ? `+${-r.cost}` : `-${r.cost}`)}</span>
                     ${r.uuid ? `<span class="log-uuid"><span class="uuid-short">${esc(r.uuid.slice(0,8))}</span><span class="uuid-full">${esc(r.uuid)}</span></span>` : ""}
                     <span class="time">${fmtTime(r.created_at)}</span>
-                </div>
-            `).join("");
+                </div>`;
+            }).join("");
         }
 
         async function deleteTeam(teamId, name) {
@@ -821,6 +828,28 @@
             const data = await res.json();
             if (!res.ok) { showToast(data.error, "error"); return; }
             showToast(`+${amount} очков всем командам`, "success");
+            loadTeams();
+        }
+
+        async function spendCustom(teamId) {
+            const input = document.getElementById(`spend-pts-${teamId}`);
+            const amount = parseInt(input.value);
+            if (!amount || amount <= 0) { showToast("Введите сумму > 0", "error"); return; }
+            spend(teamId, amount);
+        }
+
+        async function addPointsTeam(teamId) {
+            const input = document.getElementById(`add-pts-${teamId}`);
+            const amount = parseInt(input.value);
+            if (!amount || amount <= 0) return;
+            const res = await fetch(`/api/teams/${teamId}/add-points`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({amount})
+            });
+            const data = await res.json();
+            if (!res.ok) { showToast(data.error, "error"); return; }
+            showToast(`+${amount} очков команде`, "success");
             loadTeams();
         }
 

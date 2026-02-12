@@ -35,8 +35,9 @@ DATABASE = "game.db"
 
 def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DATABASE)
+        g.db = sqlite3.connect(DATABASE, timeout=10)
         g.db.row_factory = sqlite3.Row
+        g.db.execute("PRAGMA journal_mode=WAL")
     return g.db
 
 
@@ -53,7 +54,8 @@ def generate_code(length=6):
 
 
 def init_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS teams (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -92,6 +94,9 @@ def init_db():
         conn.execute("ALTER TABLE reports ADD COLUMN points_before INTEGER")
     if "points_after" not in report_columns:
         conn.execute("ALTER TABLE reports ADD COLUMN points_after INTEGER")
+    if "type" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN type TEXT")
+        conn.execute("UPDATE reports SET type = CASE WHEN cost < 0 THEN 'начисление' ELSE 'списание' END")
     # Сгенерировать коды для команд, у которых их нет
     teams_without_code = conn.execute(
         "SELECT id FROM teams WHERE code IS NULL"
@@ -135,7 +140,8 @@ def tick_points():
     while True:
         time.sleep(game_settings["tick_interval"])
         try:
-            conn = sqlite3.connect(DATABASE)
+            conn = sqlite3.connect(DATABASE, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL")
             conn.execute(
                 "UPDATE teams SET points = points + ?",
                 (game_settings["points_per_tick"],),
@@ -274,10 +280,15 @@ def spend_points(team_id):
     amount = data.get("amount")
     label = data.get("label", "")
 
-    # Validate: admin uses SPEND_OPTIONS, user uses SPEND_NAMED
-    valid_amounts = SPEND_OPTIONS + [s["cost"] for s in SPEND_NAMED]
-    if amount not in valid_amounts:
-        return jsonify(error="Недопустимая сумма списания"), 400
+    # Validate: admin can spend any positive amount, user uses SPEND_NAMED
+    is_admin = session["role"] == "admin"
+    if is_admin:
+        if not isinstance(amount, int) or amount <= 0:
+            return jsonify(error="Сумма должна быть > 0"), 400
+    else:
+        valid_amounts = [s["cost"] for s in SPEND_NAMED]
+        if amount not in valid_amounts:
+            return jsonify(error="Недопустимая сумма списания"), 400
 
     db = get_db()
     team = db.execute("SELECT id, points FROM teams WHERE id = ?", (team_id,)).fetchone()
@@ -286,15 +297,14 @@ def spend_points(team_id):
     if team["points"] < amount:
         return jsonify(error="Недостаточно очков"), 400
 
-    is_admin = session["role"] == "admin"
     txn_uuid = None if is_admin else str(uuid.uuid4())
     report_label = "admin" if is_admin else (label or None)
     points_before = team["points"]
     points_after = points_before - amount
     db.execute("UPDATE teams SET points = points - ? WHERE id = ?", (amount, team_id))
     db.execute(
-        "INSERT INTO reports (team_id, cost, points_before, points_after, label, uuid) VALUES (?, ?, ?, ?, ?, ?)",
-        (team_id, amount, points_before, points_after, report_label, txn_uuid),
+        "INSERT INTO reports (team_id, cost, points_before, points_after, label, uuid, type) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (team_id, amount, points_before, points_after, report_label, txn_uuid, "списание"),
     )
     db.commit()
     result = {"ok": True}
@@ -332,7 +342,7 @@ def list_reports():
     ).fetchone()[0]
 
     rows = db.execute(f"""
-        SELECT r.id, t.name AS team_name, r.cost, r.points_before, r.points_after, r.label, r.uuid, r.created_at
+        SELECT r.id, t.name AS team_name, r.cost, r.points_before, r.points_after, r.label, r.uuid, r.type, r.created_at
         FROM reports r JOIN teams t ON t.id = r.team_id
         {where_sql}
         ORDER BY r.created_at DESC
@@ -395,7 +405,34 @@ def add_points_all():
     if amount <= 0:
         return jsonify(error="Сумма должна быть > 0"), 400
     db = get_db()
+    teams = db.execute("SELECT id, points FROM teams").fetchall()
     db.execute("UPDATE teams SET points = points + ?", (amount,))
+    for t in teams:
+        db.execute(
+            "INSERT INTO reports (team_id, cost, points_before, points_after, label, type) VALUES (?, ?, ?, ?, ?, ?)",
+            (t["id"], -amount, t["points"], t["points"] + amount, "admin", "начисление"),
+        )
+    db.commit()
+    return jsonify(ok=True)
+
+
+@app.route("/api/teams/<int:team_id>/add-points", methods=["POST"])
+@admin_required
+def add_points_team(team_id):
+    data = request.get_json(force=True)
+    amount = int(data.get("amount", 0))
+    if amount <= 0:
+        return jsonify(error="Сумма должна быть > 0"), 400
+    db = get_db()
+    team = db.execute("SELECT id, points FROM teams WHERE id = ?", (team_id,)).fetchone()
+    if not team:
+        return jsonify(error="Команда не найдена"), 404
+    points_before = team["points"]
+    db.execute("UPDATE teams SET points = points + ? WHERE id = ?", (amount, team_id))
+    db.execute(
+        "INSERT INTO reports (team_id, cost, points_before, points_after, label, type) VALUES (?, ?, ?, ?, ?, ?)",
+        (team_id, -amount, points_before, points_before + amount, "admin", "начисление"),
+    )
     db.commit()
     return jsonify(ok=True)
 
