@@ -66,6 +66,8 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             team_id INTEGER NOT NULL,
             cost INTEGER NOT NULL,
+            points_before INTEGER,
+            points_after INTEGER,
             label TEXT,
             uuid TEXT,
             status TEXT DEFAULT 'pending',
@@ -86,6 +88,10 @@ def init_db():
         conn.execute("ALTER TABLE reports ADD COLUMN label TEXT")
     if "uuid" not in report_columns:
         conn.execute("ALTER TABLE reports ADD COLUMN uuid TEXT")
+    if "points_before" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN points_before INTEGER")
+    if "points_after" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN points_after INTEGER")
     # Сгенерировать коды для команд, у которых их нет
     teams_without_code = conn.execute(
         "SELECT id FROM teams WHERE code IS NULL"
@@ -280,37 +286,62 @@ def spend_points(team_id):
     if team["points"] < amount:
         return jsonify(error="Недостаточно очков"), 400
 
-    txn_uuid = str(uuid.uuid4())
+    is_admin = session["role"] == "admin"
+    txn_uuid = None if is_admin else str(uuid.uuid4())
+    report_label = "admin" if is_admin else (label or None)
+    points_before = team["points"]
+    points_after = points_before - amount
     db.execute("UPDATE teams SET points = points - ? WHERE id = ?", (amount, team_id))
     db.execute(
-        "INSERT INTO reports (team_id, cost, status, label, uuid) VALUES (?, ?, 'pending', ?, ?)",
-        (team_id, amount, label or None, txn_uuid),
+        "INSERT INTO reports (team_id, cost, points_before, points_after, label, uuid) VALUES (?, ?, ?, ?, ?, ?)",
+        (team_id, amount, points_before, points_after, report_label, txn_uuid),
     )
     db.commit()
-    return jsonify(ok=True, uuid=txn_uuid)
+    result = {"ok": True}
+    if txn_uuid:
+        result["uuid"] = txn_uuid
+    return jsonify(result)
 
 
 @app.route("/api/reports")
 @login_required
 def list_reports():
+    page = max(1, int(request.args.get("page", 1)))
+    per_page = max(1, min(100, int(request.args.get("per_page", 20))))
+    search = (request.args.get("q") or "").strip()
+    offset = (page - 1) * per_page
     db = get_db()
-    if session["role"] == "admin":
-        rows = db.execute("""
-            SELECT r.id, t.name AS team_name, r.cost, r.label, r.uuid, r.status, r.created_at
-            FROM reports r JOIN teams t ON t.id = r.team_id
-            ORDER BY r.created_at DESC
-            LIMIT 50
-        """).fetchall()
-    else:
-        team_id = session.get("team_id")
-        rows = db.execute("""
-            SELECT r.id, t.name AS team_name, r.cost, r.label, r.uuid, r.status, r.created_at
-            FROM reports r JOIN teams t ON t.id = r.team_id
-            WHERE r.team_id = ?
-            ORDER BY r.created_at DESC
-            LIMIT 50
-        """, (team_id,)).fetchall()
-    return jsonify([dict(r) for r in rows])
+
+    base_where = []
+    params_where = []
+
+    if session["role"] != "admin":
+        base_where.append("r.team_id = ?")
+        params_where.append(session.get("team_id"))
+
+    if search:
+        base_where.append("(t.name LIKE ? OR r.uuid LIKE ?)")
+        like = f"%{search}%"
+        params_where.extend([like, like])
+
+    where_sql = ("WHERE " + " AND ".join(base_where)) if base_where else ""
+
+    total = db.execute(
+        f"SELECT COUNT(*) FROM reports r JOIN teams t ON t.id = r.team_id {where_sql}",
+        params_where,
+    ).fetchone()[0]
+
+    rows = db.execute(f"""
+        SELECT r.id, t.name AS team_name, r.cost, r.points_before, r.points_after, r.label, r.uuid, r.created_at
+        FROM reports r JOIN teams t ON t.id = r.team_id
+        {where_sql}
+        ORDER BY r.created_at DESC
+        LIMIT ? OFFSET ?
+    """, params_where + [per_page, offset]).fetchall()
+
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    return jsonify(items=[dict(r) for r in rows], page=page, per_page=per_page,
+                   total=total, total_pages=total_pages)
 
 
 @app.route("/api/teams/<int:team_id>", methods=["DELETE"])

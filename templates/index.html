@@ -270,16 +270,6 @@
         }
         .log-entry .cost { color: #ef5b5b; font-weight: 600; }
         .log-entry .time { color: #555; }
-        .log-entry .status {
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .status-pending { background: #3a3520; color: #efc35b; }
-        .status-accepted { background: #1a3520; color: #5bef8f; }
-        .status-rejected { background: #351a1a; color: #ef5b5b; }
-        .status-rework { background: #35301a; color: #efb85b; }
 
         .toast {
             position: fixed;
@@ -343,6 +333,28 @@
             cursor: pointer;
         }
         .modal button:hover { background: #4a5bdb; }
+
+        /* Пагинация */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin-top: 16px;
+        }
+        .pagination button {
+            padding: 6px 12px;
+            background: #2a2d3a;
+            color: #ccc;
+            border: 1px solid #3a3d4a;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .pagination button:hover { background: #3a3d4a; color: #fff; }
+        .pagination button:disabled { opacity: 0.3; cursor: not-allowed; }
+        .pagination button.active { background: #5b6eef; color: #fff; border-color: #5b6eef; }
+        .pagination .page-info { font-size: 12px; color: #666; }
 
         /* Админ-панель управления */
         .admin-controls {
@@ -465,11 +477,12 @@
             </div>
 
             <div class="log-title">Лог списаний</div>
-            <input type="text" id="log-search" placeholder="Поиск по имени или UUID..." oninput="filterLog()" style="
+            <input type="text" id="log-search" placeholder="Поиск по имени или UUID..." oninput="onSearchInput()" style="
                 width:100%; padding:8px 14px; margin-bottom:12px; background:#1a1d2a;
                 border:1px solid #2a2d3a; border-radius:8px; color:#fff; font-size:14px; outline:none;
             " onfocus="this.style.borderColor='#5b6eef'" onblur="this.style.borderColor='#2a2d3a'">
             <div class="log" id="log"></div>
+            <div class="pagination" id="pagination"></div>
         </div>
     </div>
 
@@ -479,6 +492,8 @@
         let spendOptions = [];
         let spendNamed = [];
         let allReports = [];
+        let currentPage = 1;
+        let totalPages = 1;
         let currentRole = null;
         let currentTeamId = null;
         let pollInterval = null;
@@ -621,11 +636,37 @@
             }
         }
 
-        async function loadReports() {
-            const res = await fetch("/api/reports");
+        async function loadReports(page) {
+            if (page !== undefined) currentPage = page;
+            const query = (document.getElementById("log-search").value || "").trim();
+            let url = `/api/reports?page=${currentPage}&per_page=20`;
+            if (query) url += `&q=${encodeURIComponent(query)}`;
+            const res = await fetch(url);
             if (res.status === 401) { showLogin(); return; }
-            allReports = await res.json();
-            filterLog();
+            const data = await res.json();
+            allReports = data.items;
+            currentPage = data.page;
+            totalPages = data.total_pages;
+            renderLog();
+            renderPagination(data.total);
+        }
+
+        function renderPagination(total) {
+            const el = document.getElementById("pagination");
+            if (totalPages <= 1) { el.innerHTML = ""; return; }
+            let html = `<button ${currentPage <= 1 ? "disabled" : ""} onclick="loadReports(${currentPage - 1})">&laquo;</button>`;
+            const start = Math.max(1, currentPage - 2);
+            const end = Math.min(totalPages, currentPage + 2);
+            if (start > 1) html += `<button onclick="loadReports(1)">1</button>`;
+            if (start > 2) html += `<span class="page-info">...</span>`;
+            for (let p = start; p <= end; p++) {
+                html += `<button class="${p === currentPage ? 'active' : ''}" onclick="loadReports(${p})">${p}</button>`;
+            }
+            if (end < totalPages - 1) html += `<span class="page-info">...</span>`;
+            if (end < totalPages) html += `<button onclick="loadReports(${totalPages})">${totalPages}</button>`;
+            html += `<button ${currentPage >= totalPages ? "disabled" : ""} onclick="loadReports(${currentPage + 1})">&raquo;</button>`;
+            html += `<span class="page-info">${total} записей</span>`;
+            el.innerHTML = html;
         }
 
         async function createTeam() {
@@ -718,25 +759,24 @@
             document.body.appendChild(overlay);
         }
 
-        function filterLog() {
-            const query = (document.getElementById("log-search").value || "").toLowerCase();
-            const filtered = query
-                ? allReports.filter(r =>
-                    r.team_name.toLowerCase().includes(query) ||
-                    (r.uuid && r.uuid.toLowerCase().includes(query)))
-                : allReports;
+        let searchTimer = null;
+        function onSearchInput() {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadReports(1), 300);
+        }
+
+        function renderLog() {
             const log = document.getElementById("log");
-            if (!filtered.length) {
+            if (!allReports.length) {
                 log.innerHTML = '<div class="log-entry" style="color:#555">Нет записей</div>';
                 return;
             }
-            log.innerHTML = filtered.map(r => `
+            log.innerHTML = allReports.map(r => `
                 <div class="log-entry">
                     <span>${esc(r.team_name)}</span>
                     ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
-                    <span class="cost">-${r.cost}</span>
+                    <span class="cost">${r.points_before != null ? `${r.points_before} → ${r.points_after}` : `-${r.cost}`}</span>
                     ${r.uuid ? `<span class="log-uuid"><span class="uuid-short">${esc(r.uuid.slice(0,8))}</span><span class="uuid-full">${esc(r.uuid)}</span></span>` : ""}
-                    <span class="status status-${r.status}">${r.status}</span>
                     <span class="time">${fmtTime(r.created_at)}</span>
                 </div>
             `).join("");
@@ -801,7 +841,8 @@
         function fmtTime(ts) {
             if (!ts) return "";
             const d = new Date(ts + "Z");
-            return d.toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
+            return d.toLocaleDateString("ru-RU", {day: "2-digit", month: "2-digit", year: "numeric"})
+                + " " + d.toLocaleTimeString("ru-RU", {hour: "2-digit", minute: "2-digit", second: "2-digit"});
         }
 
         // Enter для логина
