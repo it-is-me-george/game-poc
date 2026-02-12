@@ -402,11 +402,17 @@ def add_points_all():
 
 # ---- Запуск ----
 
-if __name__ == "__main__":
-    init_db()
+init_db()
+
+
+def start_tick_thread():
     t = threading.Thread(target=tick_points, daemon=True)
     t.start()
-    print(f"Game started: +{game_settings['points_per_tick']} pts every {game_settings['tick_interval']}s")
+    print(f"Tick started: +{game_settings['points_per_tick']} pts every {game_settings['tick_interval']}s")
+
+
+if __name__ == "__main__":
+    start_tick_thread()
     print(f"Spend options: {SPEND_OPTIONS}")
     print(f"Admin password: {ADMIN_PASSWORD}")
     app.run(host="0.0.0.0", debug=False, port=5000)
