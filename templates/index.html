@@ -407,6 +407,7 @@
     <div class="container">
         <!-- Экран входа -->
         <div id="login-screen" class="login-screen hidden">
+            <img src="/static/logo.jpeg" alt="Logo" style="width:80px;border-radius:12px;margin-bottom:8px;">
             <h2>Action Points Game</h2>
             <p>Введите код для входа</p>
             <div class="login-form">
@@ -419,7 +420,10 @@
         <!-- Основной интерфейс -->
         <div id="main-app" class="hidden">
             <header>
-                <h1>Action Points Game</h1>
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:8px;">
+                    <img src="/static/logo.jpeg" alt="Logo" style="width:40px;border-radius:8px;">
+                    <h1 style="margin:0">Action Points Game</h1>
+                </div>
                 <div class="config-info" id="config-info"></div>
                 <div class="header-right">
                     <span class="role-badge" id="role-badge"></span>
