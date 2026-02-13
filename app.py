@@ -21,11 +21,9 @@ SPEND_NAMED = [
 ]
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
-# Mutable runtime settings (admin can change via UI)
-game_settings = {
-    "points_per_tick": int(os.getenv("POINTS_PER_MINUTE", 100)),
-    "tick_interval": int(os.getenv("TICK_INTERVAL", 60)),
-}
+# Default settings (used only for initial DB seed)
+DEFAULT_POINTS_PER_TICK = int(os.getenv("POINTS_PER_MINUTE", 100))
+DEFAULT_TICK_INTERVAL = int(os.getenv("TICK_INTERVAL", 60))
 # ===================================================
 
 app = Flask(__name__)
@@ -76,16 +74,28 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (team_id) REFERENCES teams(id)
         );
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
     """)
+    # Seed default settings if not present
+    existing = conn.execute("SELECT key FROM settings").fetchall()
+    existing_keys = {row[0] for row in existing}
+    if "points_per_tick" not in existing_keys:
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)",
+                     ("points_per_tick", str(DEFAULT_POINTS_PER_TICK)))
+    if "tick_interval" not in existing_keys:
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?)",
+                     ("tick_interval", str(DEFAULT_TICK_INTERVAL)))
     # Миграция: добавить столбец code если его нет (для существующих БД)
     cursor = conn.execute("PRAGMA table_info(teams)")
     columns = [row[1] for row in cursor.fetchall()]
     if "code" not in columns:
         conn.execute("ALTER TABLE teams ADD COLUMN code TEXT")
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_code ON teams(code)")
-    # Миграция: добавить столбец label в reports если его нет
-    cursor2 = conn.execute("PRAGMA table_info(reports)")
-    report_columns = [row[1] for row in cursor2.fetchall()]
+    # Миграция: добавить столбцы в reports если их нет
+    report_columns = [row[1] for row in conn.execute("PRAGMA table_info(reports)").fetchall()]
     if "label" not in report_columns:
         conn.execute("ALTER TABLE reports ADD COLUMN label TEXT")
     if "uuid" not in report_columns:
@@ -97,6 +107,8 @@ def init_db():
     if "type" not in report_columns:
         conn.execute("ALTER TABLE reports ADD COLUMN type TEXT")
         conn.execute("UPDATE reports SET type = CASE WHEN cost < 0 THEN 'начисление' ELSE 'списание' END")
+    if "checked" not in report_columns:
+        conn.execute("ALTER TABLE reports ADD COLUMN checked INTEGER DEFAULT 0")
     # Сгенерировать коды для команд, у которых их нет
     teams_without_code = conn.execute(
         "SELECT id FROM teams WHERE code IS NULL"
@@ -112,6 +124,18 @@ def init_db():
         conn.execute("UPDATE teams SET code = ? WHERE id = ?", (code, team_id))
     conn.commit()
     conn.close()
+
+
+def get_settings(conn=None):
+    """Read game settings from DB. Accepts either a raw connection or uses Flask g.db."""
+    if conn is None:
+        conn = get_db()
+    rows = conn.execute("SELECT key, value FROM settings").fetchall()
+    s = {row[0]: row[1] for row in rows}
+    return {
+        "points_per_tick": int(s.get("points_per_tick", DEFAULT_POINTS_PER_TICK)),
+        "tick_interval": int(s.get("tick_interval", DEFAULT_TICK_INTERVAL)),
+    }
 
 
 # ---- Декораторы авторизации ----
@@ -138,14 +162,25 @@ def admin_required(f):
 
 def tick_points():
     while True:
-        time.sleep(game_settings["tick_interval"])
+        try:
+            conn = sqlite3.connect(DATABASE, timeout=10)
+            conn.row_factory = sqlite3.Row
+            conn.execute("PRAGMA journal_mode=WAL")
+            settings = get_settings(conn)
+            interval = settings["tick_interval"]
+            pts = settings["points_per_tick"]
+            conn.close()
+        except Exception as e:
+            print(f"Tick settings error: {e}")
+            interval = DEFAULT_TICK_INTERVAL
+            pts = DEFAULT_POINTS_PER_TICK
+
+        time.sleep(interval)
+
         try:
             conn = sqlite3.connect(DATABASE, timeout=10)
             conn.execute("PRAGMA journal_mode=WAL")
-            conn.execute(
-                "UPDATE teams SET points = points + ?",
-                (game_settings["points_per_tick"],),
-            )
+            conn.execute("UPDATE teams SET points = points + ?", (pts,))
             conn.commit()
             conn.close()
         except Exception as e:
@@ -210,11 +245,12 @@ def me():
 
 @app.route("/api/config")
 def config():
+    settings = get_settings()
     return jsonify(
-        points_per_tick=game_settings["points_per_tick"],
+        points_per_tick=settings["points_per_tick"],
         spend_options=SPEND_OPTIONS,
         spend_named=SPEND_NAMED,
-        tick_interval=game_settings["tick_interval"],
+        tick_interval=settings["tick_interval"],
     )
 
 
@@ -342,7 +378,7 @@ def list_reports():
     ).fetchone()[0]
 
     rows = db.execute(f"""
-        SELECT r.id, t.name AS team_name, r.cost, r.points_before, r.points_after, r.label, r.uuid, r.type, r.created_at
+        SELECT r.id, t.name AS team_name, r.cost, r.points_before, r.points_after, r.label, r.uuid, r.type, r.checked, r.created_at
         FROM reports r JOIN teams t ON t.id = r.team_id
         {where_sql}
         ORDER BY r.created_at DESC
@@ -367,6 +403,19 @@ def delete_team(team_id):
     return jsonify(ok=True)
 
 
+@app.route("/api/reports/<int:report_id>/check", methods=["POST"])
+@admin_required
+def toggle_check(report_id):
+    db = get_db()
+    report = db.execute("SELECT id, checked FROM reports WHERE id = ?", (report_id,)).fetchone()
+    if not report:
+        return jsonify(error="Запись не найдена"), 404
+    new_val = 0 if report["checked"] else 1
+    db.execute("UPDATE reports SET checked = ? WHERE id = ?", (new_val, report_id))
+    db.commit()
+    return jsonify(ok=True, checked=new_val)
+
+
 # ---- Админ: управление игрой ----
 
 @app.route("/api/admin/settings", methods=["POST"])
@@ -375,17 +424,20 @@ def update_settings():
     data = request.get_json(force=True)
     pts = data.get("points_per_tick")
     interval = data.get("tick_interval")
+    db = get_db()
     if pts is not None:
         pts = int(pts)
         if pts < 0:
             return jsonify(error="Очки не могут быть отрицательными"), 400
-        game_settings["points_per_tick"] = pts
+        db.execute("UPDATE settings SET value = ? WHERE key = ?", (str(pts), "points_per_tick"))
     if interval is not None:
         interval = int(interval)
         if interval < 1:
             return jsonify(error="Интервал должен быть >= 1 секунды"), 400
-        game_settings["tick_interval"] = interval
-    return jsonify(ok=True, **game_settings)
+        db.execute("UPDATE settings SET value = ? WHERE key = ?", (str(interval), "tick_interval"))
+    db.commit()
+    settings = get_settings()
+    return jsonify(ok=True, **settings)
 
 
 @app.route("/api/admin/reset-points", methods=["POST"])
@@ -445,7 +497,7 @@ init_db()
 def start_tick_thread():
     t = threading.Thread(target=tick_points, daemon=True)
     t.start()
-    print(f"Tick started: +{game_settings['points_per_tick']} pts every {game_settings['tick_interval']}s")
+    print("Tick thread started (reads settings from DB)")
 
 
 if __name__ == "__main__":

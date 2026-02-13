@@ -783,6 +783,7 @@
                 const typeLabel = r.type || (r.cost < 0 ? "начисление" : "списание");
                 return `
                 <div class="log-entry">
+                    ${currentRole === "admin" && r.uuid ? `<input type="checkbox" ${r.checked ? "checked" : ""} onchange="toggleCheck(${r.id})" style="cursor:pointer;accent-color:#5bef8f;" title="Отметить как сданное">` : ""}
                     <span>${esc(r.team_name)}</span>
                     <span style="${typeStyle};font-weight:600;font-size:12px">${esc(typeLabel)}</span>
                     ${r.label ? `<span style="color:#aaa">${esc(r.label)}</span>` : ""}
@@ -791,6 +792,18 @@
                     <span class="time">${fmtTime(r.created_at)}</span>
                 </div>`;
             }).join("");
+        }
+
+        async function toggleCheck(reportId) {
+            const res = await fetch(`/api/reports/${reportId}/check`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"}
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                showToast(data.error, "error");
+                loadReports();
+            }
         }
 
         async function deleteTeam(teamId, name) {
