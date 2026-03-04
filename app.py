@@ -17,7 +17,7 @@ SPEND_NAMED = [
     {"name": "Old office", "cost": 2},
     {"name": "Scada", "cost": 3},
     {"name": "New office", "cost": 5},
-    {"name": "Response office", "cost": 7},
+    {"name": "Response office", "cost": 10},
 ]
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
